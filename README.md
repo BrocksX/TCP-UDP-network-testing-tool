@@ -2,7 +2,7 @@
 
 A simple and efficient network transmission test tool that supports running in server or client mode under TCP and UDP protocols, listening to ports, and receiving and sending data.
 
-![ui](https://github.com/BrocksX/TCP-UDP-network-testing-tool/raw/main/ui.png)
+![ui](https://github.com/BrocksX/TCP-UDP-network-testing-tool/blob/main/ui.png)
 
 Environment：
 
