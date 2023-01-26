@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>iron.ico</file>
+    </qresource>
+</RCC>
