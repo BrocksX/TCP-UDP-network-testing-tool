@@ -2,7 +2,7 @@
 
 A simple and efficient network transmission test tool that supports running in server or client mode under TCP and UDP protocols, listening to ports, and receiving and sending data.
 
-![ui](ui.png)
+![ui](./ui.png)
 
 Environment：
 
