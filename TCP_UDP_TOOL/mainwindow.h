@@ -9,8 +9,7 @@
 #include <QUdpSocket>
 #include <QFileDialog>
 #include <QTime>
-
-#include "aboutsoftware.h"
+#include <vector>
 
 
 QT_BEGIN_NAMESPACE
@@ -47,7 +46,8 @@ private slots:
 private:
     Ui::MainWindow *ui;
     std::unique_ptr<QTcpServer> server_;
-    std::unique_ptr<QTcpSocket> socket_;
+    std::vector<QTcpSocket*> acceptSockets;
+    std::unique_ptr<QTcpSocket> clientSocket_;
     std::unique_ptr<QUdpSocket> udpListenSocket_;
     std::unique_ptr<QUdpSocket> udpConnectSocket_;
 };

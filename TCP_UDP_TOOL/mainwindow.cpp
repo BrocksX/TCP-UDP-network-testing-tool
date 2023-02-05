@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "aboutsoftware.h"
 
 const short CONNECT_WAIT_SEC = 5;
 const short TCP_MODE = -2;
@@ -47,9 +48,10 @@ void MainWindow::on_server_listen_clicked()
             log("TCP SERVER: listening");
             connect(server_.get(), &QTcpServer::newConnection, [&]()
             {
-                socket_ = std::unique_ptr<QTcpSocket>(server_->nextPendingConnection());
-                connect(socket_.get(), SIGNAL(readyRead()), this, SLOT(receiveMsg()));
-                connect(socket_.get(), &QTcpSocket::disconnected, [&]()
+                QTcpSocket *socket = server_->nextPendingConnection();
+                acceptSockets.emplace_back(socket);
+                connect(socket, SIGNAL(readyRead()), this, SLOT(receiveMsg()));
+                connect(socket, &QTcpSocket::disconnected, [&]()
                 {
                     log("TCP: client disconnected");
                 });
@@ -105,6 +107,9 @@ void MainWindow::on_server_disconnect_clicked()
     {
         log("TCP SERVER: stop listening");
         server_->close();
+        for(const auto s : acceptSockets)
+            s->close();
+        acceptSockets.clear();
     }
     if(ui->modeSelect->checkedId() == UDP_MODE && udpListenSocket_)
     {
@@ -122,12 +127,33 @@ void MainWindow::on_clearBut_clicked()
 
 void MainWindow::on_sendBut_clicked()
 {
-    if(ui->modeSelect->checkedId() == TCP_MODE && socket_)
+    if(ui->modeSelect->checkedId() == TCP_MODE)
     {
-        socket_->write(ui->textEdit->toPlainText().toLocal8Bit());
-        socket_->waitForBytesWritten();
-        log("TCP send message");
-        qDebug()<<"SEND: "<<ui->textEdit->toPlainText().toLocal8Bit();
+        bool hadWirte = false;
+        if(clientSocket_ && clientSocket_->state() == QAbstractSocket::ConnectedState)
+        {
+            clientSocket_->write(ui->textEdit->toPlainText().toLocal8Bit());
+            clientSocket_->waitForBytesWritten();
+            hadWirte = true;
+        }
+        for(const auto & s : acceptSockets)
+        {
+            if(s->state() == QAbstractSocket::ConnectedState)
+            {
+                s->write(ui->textEdit->toPlainText().toLocal8Bit());
+                s->waitForBytesWritten();
+                hadWirte = true;
+            }
+        }
+        if(hadWirte)
+        {
+            log("TCP send message");
+            qDebug()<<"SEND: "<<ui->textEdit->toPlainText().toLocal8Bit();
+        }
+        else
+        {
+            QMessageBox::information(this, "提示", "没有可发送信息的目标");
+        }
     }
     else if (ui->modeSelect->checkedId() == UDP_MODE && udpConnectSocket_)
     {
@@ -165,9 +191,9 @@ void MainWindow::on_client_connect_clicked()
     QHostAddress addr = QHostAddress(ip_str);
     if(ui->modeSelect->checkedId() == TCP_MODE)// TCP设置
     {
-        this->socket_ = std::unique_ptr<QTcpSocket>(new QTcpSocket());
-        socket_->connectToHost(addr,port);
-        if(socket_->waitForConnected(CONNECT_WAIT_SEC * 1000))
+        this->clientSocket_ = std::unique_ptr<QTcpSocket>(new QTcpSocket());
+        clientSocket_->connectToHost(addr,port);
+        if(clientSocket_->waitForConnected(CONNECT_WAIT_SEC * 1000))
         {
             log("TCP CLIENT: connected");
             ui->portEdit->setEnabled(false);
@@ -178,10 +204,10 @@ void MainWindow::on_client_connect_clicked()
             ui->TcpBut->setEnabled(false);
             ui->UdpBut->setEnabled(false);
             ui->sendBut->setEnabled(true);
-            connect(socket_.get(), SIGNAL(readyRead()), this, SLOT(receiveMsg()));
+            connect(clientSocket_.get(), SIGNAL(readyRead()), this, SLOT(receiveMsg()));
             disconnect(ui->connectBut, SIGNAL(clicked()), this, SLOT(on_client_connect_clicked()));
             connect(ui->connectBut, SIGNAL(clicked()), this, SLOT(on_client_disconnect_clicked()));
-            connect(socket_.get(), &QTcpSocket::disconnected, [&]()
+            connect(clientSocket_.get(), &QTcpSocket::disconnected, [&]()
             {
                 log("TCP: disconnected");
             });
@@ -219,10 +245,10 @@ void MainWindow::on_client_disconnect_clicked()
     ui->TcpBut->setEnabled(true);
     ui->UdpBut->setEnabled(true);
     ui->sendBut->setEnabled(false);
-    if(ui->modeSelect->checkedId() == TCP_MODE && socket_)
+    if(ui->modeSelect->checkedId() == TCP_MODE && clientSocket_)
     {
         log("TCP connection close");
-        socket_->close();
+        clientSocket_->close();
     }
     if(ui->modeSelect->checkedId() == UDP_MODE && udpConnectSocket_)
     {
@@ -234,7 +260,7 @@ void MainWindow::on_client_disconnect_clicked()
 void MainWindow::receiveMsg()
 {
     log("TCP receive message");
-    ui->msgDisplay->insertPlainText(QString(this->socket_->readAll()));
+    ui->msgDisplay->append(QString( qobject_cast<QTcpSocket*>(sender())->readAll() ));
 }
 
 void MainWindow::udpReadMsg()
